@@ -20,6 +20,7 @@ namespace Nop.Services.Catalog
         private readonly IProductAttributeService _productAttributeService;
         private readonly ILanguageService _languageService;
         private readonly ILocalizedEntityService _localizedEntityService;
+        private readonly ILocalizationService _localizationService;
         private readonly IPictureService _pictureService;
         private readonly ICategoryService _categoryService;
         private readonly IManufacturerService _manufacturerService;
@@ -37,6 +38,7 @@ namespace Nop.Services.Catalog
             IProductAttributeService productAttributeService,
             ILanguageService languageService,
             ILocalizedEntityService localizedEntityService, 
+            ILocalizationService localizationService,
             IPictureService pictureService,
             ICategoryService categoryService, 
             IManufacturerService manufacturerService,
@@ -50,6 +52,7 @@ namespace Nop.Services.Catalog
             this._productAttributeService = productAttributeService;
             this._languageService = languageService;
             this._localizedEntityService = localizedEntityService;
+            this._localizationService = localizationService;
             this._pictureService = pictureService;
             this._categoryService = categoryService;
             this._manufacturerService = manufacturerService;
@@ -298,6 +301,13 @@ namespace Nop.Services.Catalog
                 }
             }
 
+            //quantity change history
+            if (!product.UseMultipleWarehouses)
+            {
+                _productService.AddStockQuantityHistoryEntry(productCopy, product.StockQuantity, product.StockQuantity, product.WarehouseId,
+                    string.Format(_localizationService.GetResource("Admin.StockQuantityHistory.Messages.CopyProduct"), product.Id));
+            }
+
             // product <-> warehouses mappings
             foreach (var pwi in product.ProductWarehouseInventory)
             {
@@ -310,6 +320,14 @@ namespace Nop.Services.Catalog
                 };
 
                 productCopy.ProductWarehouseInventory.Add(pwiCopy);
+
+                //quantity change history
+                if (product.UseMultipleWarehouses)
+                {
+                    var message = string.Format("{0} {1}", _localizationService.GetResource("Admin.StockQuantityHistory.Messages.MultipleWarehouses"),
+                        string.Format(_localizationService.GetResource("Admin.StockQuantityHistory.Messages.CopyProduct"), product.Id));
+                    _productService.AddStockQuantityHistoryEntry(productCopy, pwi.StockQuantity, pwi.StockQuantity, pwi.WarehouseId, message);
+                }
             }
             _productService.UpdateProduct(productCopy);
 
@@ -522,6 +540,15 @@ namespace Nop.Services.Catalog
                     NotifyAdminForQuantityBelow = combination.NotifyAdminForQuantityBelow
                 };
                 _productAttributeService.InsertProductAttributeCombination(combinationCopy);
+
+                //quantity change history
+                if (product.ManageInventoryMethod == ManageInventoryMethod.ManageStockByAttributes)
+                {
+                    var message = string.Format("{0} {1}",
+                        string.Format(_localizationService.GetResource("Admin.StockQuantityHistory.Messages.Combination"), combination.Id),
+                        string.Format(_localizationService.GetResource("Admin.StockQuantityHistory.Messages.CopyProduct"), product.Id));
+                    _productService.AddStockQuantityHistoryEntry(productCopy, combination.StockQuantity, combination.StockQuantity, message: message, combinationId: combination.Id);
+                }
             }
 
             //tier prices
